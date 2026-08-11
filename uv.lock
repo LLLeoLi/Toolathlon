@@ -176,7 +176,7 @@ wheels = [
 [[package]]
 name = "arxiv-mcp-server"
 version = "0.2.10"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/LLLeoLi/arxiv-mcp-server?rev=84f58c72549522d44598a5d64ac9e12e45562e09#84f58c72549522d44598a5d64ac9e12e45562e09" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
@@ -191,10 +191,6 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "sse-starlette" },
     { name = "uvicorn" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/6e/eab7ca477f135a6d8d23fef0625bd3c94dc52732c473f5d5f289bb6211bc/arxiv_mcp_server-0.2.10.tar.gz", hash = "sha256:f31d142db8665c2cc783bf504af96901e84a776678aca7636a480803ec3510c5", size = 81535, upload-time = "2025-04-22T11:22:56.455Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/08/84a0431b3c2f54b5aed47166b4fe95ffe8dd8dca624eb2ba888b08ed8595/arxiv_mcp_server-0.2.10-py3-none-any.whl", hash = "sha256:34500ca0d9fa14724062d172b2a950b58f5266216ca885f7f8b302216fe26ef9", size = 23074, upload-time = "2025-04-22T11:22:55.391Z" },
 ]
 
 [[package]]
@@ -603,15 +599,11 @@ wheels = [
 [[package]]
 name = "excel-mcp-server"
 version = "0.1.4"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/LLLeoLi/excel-mcp-server?rev=034148ccc8ab59bb5018c3c23f9037d4545e9179#034148ccc8ab59bb5018c3c23f9037d4545e9179" }
 dependencies = [
     { name = "mcp", extra = ["cli"] },
     { name = "openpyxl" },
     { name = "typer" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/da/e16b54c7ff1898f3814d24949037e10d22d9825e8a080f5c910907b4de95/excel_mcp_server-0.1.4.tar.gz", hash = "sha256:8abbc91bcfb0ec32c53cdcc424e4afc80b3574f6ffdc231182766b0b8a57fba7", size = 22037, upload-time = "2025-06-10T18:19:48.38Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/ce/8c604ea8653de138a935bd2ab4dc32bd1cfb643af7f280b9a63eb6c37cb1/excel_mcp_server-0.1.4-py3-none-any.whl", hash = "sha256:68b8ce1b7c2318fb699911488815bb351835c436fcb33fc295fb31f944dc35c4", size = 29428, upload-time = "2025-06-10T18:19:46.881Z" },
 ]
 
 [[package]]
@@ -1801,7 +1793,7 @@ requires-dist = [
     { name = "anyio", specifier = "==4.9.0" },
     { name = "arrow", specifier = "==1.3.0" },
     { name = "arxiv", specifier = "==2.2.0" },
-    { name = "arxiv-mcp-server", specifier = ">=0.2.10" },
+    { name = "arxiv-mcp-server", git = "https://github.com/LLLeoLi/arxiv-mcp-server?rev=84f58c72549522d44598a5d64ac9e12e45562e09" },
     { name = "attrdict", specifier = "==2.0.1" },
     { name = "attrs", specifier = "==25.3.0" },
     { name = "babel", specifier = "==2.17.0" },
@@ -1820,7 +1812,7 @@ requires-dist = [
     { name = "deprecated", specifier = "==1.2.18" },
     { name = "distro", specifier = "==1.9.0" },
     { name = "docutils", specifier = "==0.21.2" },
-    { name = "excel-mcp-server", specifier = ">=0.1.4" },
+    { name = "excel-mcp-server", git = "https://github.com/LLLeoLi/excel-mcp-server?rev=034148ccc8ab59bb5018c3c23f9037d4545e9179" },
     { name = "exceptiongroup", specifier = "==1.2.2" },
     { name = "fake-useragent", specifier = "==2.2.0" },
     { name = "faker", specifier = ">=37.4.2" },

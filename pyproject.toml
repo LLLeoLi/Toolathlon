@@ -176,3 +176,7 @@ dependencies = [
     "claude-agent-sdk>=0.1.43",
     "opencode-ai>=0.1.0a36",
 ]
+
+[tool.uv.sources]
+arxiv-mcp-server = { git = "https://github.com/LLLeoLi/arxiv-mcp-server", rev = "84f58c72549522d44598a5d64ac9e12e45562e09" }
+excel-mcp-server = { git = "https://github.com/LLLeoLi/excel-mcp-server", rev = "034148ccc8ab59bb5018c3c23f9037d4545e9179" }

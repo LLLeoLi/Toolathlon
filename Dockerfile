@@ -103,16 +103,16 @@ RUN if [ -d "node_modules/@lockon0927/playwright-mcp-with-chunk" ]; then \
     fi
 
 # install uv tools (combined into a single RUN command to reduce layers)
-RUN uv tool install office-powerpoint-mcp-server@2.0.6 \
-    && uv tool install office-word-mcp-server@1.1.9 \
-    && uv tool install git+https://github.com/lockon-n/wandb-mcp-server@83f6d7fe2ad2e6b6278aef4a792f35dd765fd315 \
-    && uv tool install git+https://github.com/lockon-n/cli-mcp-server@da1dcb5166597c9fbf90ede5fb1f0cd22a71a3b7 \
-    && uv tool install pdf-tools-mcp@0.1.4 \
+RUN uv tool install git+https://github.com/LLLeoLi/Office-PowerPoint-MCP-Server@2f3b9531519d193623108d9dc2d2738b86cf18c0 \
+    && uv tool install git+https://github.com/LLLeoLi/Office-Word-MCP-Server@4c3fe265c29a05b263f748b2b03e291ed30edc65 \
+    && uv tool install git+https://github.com/LLLeoLi/wandb-mcp-server@0de003f1912212ea27c9eb08d4aa927a8d905b70 \
+    && uv tool install git+https://github.com/LLLeoLi/cli-mcp-server@7147e058f5802422b12091536d0b2625ef0b2778 \
+    && uv tool install git+https://github.com/LLLeoLi/pdf-tools-mcp@98b0dba1eb0f2b7107d98b8b6610fd2139637ba5 \
     && uv tool install git+https://github.com/jkawamoto/mcp-youtube-transcript@28081729905a48bef533d864efbd867a2bfd14cd \
     && uv tool install mcp-google-sheets@0.4.1 \
-    && uv tool install git+https://github.com/lockon-n/google-cloud-mcp@7df9ca22115002e0cea75deec595492c520df3e1 \
-    && uv tool install emails-mcp@0.1.12 \
-    && uv tool install git+https://github.com/lockon-n/mcp-snowflake-server@bca38f3ef5305ac53b9935bd09edbfac442b6a36 \
+    && uv tool install git+https://github.com/LLLeoLi/google-cloud-mcp@ddb925c89c96d07870a20ef71c0878c70cbb8f13 \
+    && uv tool install git+https://github.com/LLLeoLi/emails-mcp@6401fd6dafb634308d5738aa43509fef83284d33 \
+    && uv tool install git+https://github.com/LLLeoLi/mcp-snowflake-server@51c2ff67387f649414079045bca135753791187d \
     && uv tool install git+https://github.com/lockon-n/mcp-scholarly@82a6ca268ae0d2e10664be396e1a0ea7aba23229
 
 # create local_servers directory
@@ -122,9 +122,9 @@ RUN mkdir -p local_servers
 WORKDIR /workspace/local_servers
 
 # Yahoo Finance MCP
-RUN git clone https://github.com/lockon-n/yahoo-finance-mcp \
+RUN git clone https://github.com/LLLeoLi/yahoo-finance-mcp \
     && cd yahoo-finance-mcp \
-    && git checkout 469103ba1464486cb7b8bd2c1f6355f42ca64a5b \
+    && git checkout ecb7f27b9747a10557082c9a993510d3f944d0bb \
     && uv sync
 
 # YouTube MCP Server
@@ -135,9 +135,9 @@ RUN git clone https://github.com/lockon-n/youtube-mcp-server \
     && npm run build
 
 # Arxiv LaTeX MCP
-RUN git clone https://github.com/takashiishida/arxiv-latex-mcp.git \
+RUN git clone https://github.com/LLLeoLi/arxiv-latex-mcp.git \
     && cd arxiv-latex-mcp \
-    && git checkout f8bd3b3b6d3d066fe29ba356023a0b3e8215da43 \
+    && git checkout 241cff36bab2825e4484b30b8323f0297b4a283c \
     && uv sync
 
 # Google Forms MCP

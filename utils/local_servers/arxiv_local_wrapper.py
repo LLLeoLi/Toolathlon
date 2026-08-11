@@ -127,8 +127,10 @@ async def _with_retry(
 
     A result that ``_result_is_error`` flags as retryable, or any
     exception that propagates, counts as a failure → wait and try
-    again.  Returns the last attempt's result (success or final
-    failure) when the budget is exhausted.
+    again.  When the budget is exhausted, the final failure is
+    *raised* (last exception re-raised, or a ``RuntimeError`` carrying
+    the last error text) so the MCP layer reports it with
+    ``isError=True`` instead of a normal-looking text result.
 
     ``pre_attempt_hook`` is invoked synchronously before each attempt,
     used by ``handle_download``'s wrapper to evict stale cached error
@@ -149,18 +151,14 @@ async def _with_retry(
             last_exception = None
         except BaseException as e:  # asyncio.CancelledError + everything else
             last_exception = e
-            last_result = [
-                types.TextContent(
-                    type="text",
-                    text=json.dumps({
-                        "status": "error",
-                        "message": f"{label} raised on attempt {i + 1}: {e!r}",
-                    }),
-                )
-            ]
+            last_result = None
             # If the parent cancelled us, don't keep retrying.
             if isinstance(e, asyncio.CancelledError):
                 raise
+            logger.info(
+                "%s: attempt %d/%d raised %r, will retry",
+                label, i + 1, ATTEMPTS, e,
+            )
             continue
 
         if not _result_is_error(last_result):
@@ -174,18 +172,19 @@ async def _with_retry(
         )
 
     logger.warning(
-        "%s: exhausted %d attempts; returning the last response",
+        "%s: exhausted %d attempts; raising the last failure",
         label, ATTEMPTS,
     )
-    return last_result if last_result is not None else [
-        types.TextContent(
-            type="text",
-            text=json.dumps({
-                "status": "error",
-                "message": f"{label} exhausted retries with no result",
-            }),
-        )
-    ]
+    if last_exception is not None:
+        raise last_exception
+    error_text = "".join(
+        chunk.text
+        for chunk in (last_result or [])
+        if isinstance(chunk, types.TextContent)
+    )
+    raise RuntimeError(
+        error_text or f"{label} exhausted retries with no result"
+    )
 
 
 # ── handle_download wrapper ──────────────────────────────────────────
