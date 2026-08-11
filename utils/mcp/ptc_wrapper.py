@@ -247,18 +247,45 @@ def _coerce_block(text: str) -> tuple:
       2. a Python ``repr`` container via ``ast.literal_eval`` — only attempted
          when the text looks like a top-level ``[``/``{``/``(`` collection, so
          genuine prose (file contents, error strings) is never mis-parsed;
-      3. otherwise ``(text, False)`` — caller keeps it as a string.
+      3. the snowflake-style ``type: data`` YAML envelope (see
+         ``_coerce_yaml_data_envelope``) — the one lossless non-JSON format a
+         deployed server emits for query results;
+      4. otherwise ``(text, False)`` — caller keeps it as a string.
     """
     try:
         return json.loads(text), True
     except (json.JSONDecodeError, TypeError):
         pass
-    if text.lstrip()[:1] not in ("[", "{", "("):
+    if text.lstrip()[:1] in ("[", "{", "("):
+        try:
+            return ast.literal_eval(text), True
+        except (ValueError, SyntaxError, MemoryError, RecursionError):
+            return text, False
+    return _coerce_yaml_data_envelope(text)
+
+
+def _coerce_yaml_data_envelope(text: str) -> tuple:
+    """Parse the ``type: data`` YAML envelope snowflake query tools emit.
+
+    The snowflake server (with ``--exclude-json-results``) returns query
+    results as YAML text — lossless, but opaque to the sandbox, which forces
+    generated code to hand-roll YAML-subset parsers. Deliberately *not* a
+    general YAML fallback: multi-line prose (email headers, ``key: value``
+    reports) would happily yaml-parse into dicts and silently change type for
+    tools whose string returns are working as intended. The guard therefore
+    accepts exactly the envelope shape: leading ``type: data`` line and a
+    mapping carrying a ``data`` key. Anything else stays a string.
+    """
+    if not text.startswith("type: data"):
         return text, False
     try:
-        return ast.literal_eval(text), True
-    except (ValueError, SyntaxError, MemoryError, RecursionError):
+        import yaml
+        parsed = yaml.safe_load(text)
+    except Exception:
         return text, False
+    if isinstance(parsed, dict) and parsed.get("type") == "data" and "data" in parsed:
+        return parsed, True
+    return text, False
 
 
 def _stringify_result(result: Any) -> Any:
