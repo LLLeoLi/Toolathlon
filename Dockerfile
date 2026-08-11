@@ -47,7 +47,10 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install -g npm@latest
+    && npm install -g npm@latest \
+    # npm >= 11.5 disables git dependencies by default (EALLOWGIT); the
+    # package.json pins several servers as github: refs
+    && npm config set -g allow-git all
 
 # install Docker CLI (for remote Docker daemon connection)
 RUN wget -q https://download.docker.com/linux/static/stable/x86_64/docker-24.0.7.tgz \
@@ -107,7 +110,7 @@ RUN uv tool install git+https://github.com/LLLeoLi/Office-PowerPoint-MCP-Server@
     && uv tool install git+https://github.com/LLLeoLi/Office-Word-MCP-Server@4c3fe265c29a05b263f748b2b03e291ed30edc65 \
     && uv tool install git+https://github.com/LLLeoLi/wandb-mcp-server@0de003f1912212ea27c9eb08d4aa927a8d905b70 \
     && uv tool install git+https://github.com/LLLeoLi/cli-mcp-server@7147e058f5802422b12091536d0b2625ef0b2778 \
-    && uv tool install git+https://github.com/LLLeoLi/pdf-tools-mcp@98b0dba1eb0f2b7107d98b8b6610fd2139637ba5 \
+    && uv tool install git+https://github.com/LLLeoLi/pdf-tools-mcp@391bdc2f1b3a67043617c66addd453fe0c2bb437 \
     && uv tool install git+https://github.com/jkawamoto/mcp-youtube-transcript@28081729905a48bef533d864efbd867a2bfd14cd \
     && uv tool install mcp-google-sheets@0.4.1 \
     && uv tool install git+https://github.com/LLLeoLi/google-cloud-mcp@ddb925c89c96d07870a20ef71c0878c70cbb8f13 \
@@ -124,7 +127,7 @@ WORKDIR /workspace/local_servers
 # Yahoo Finance MCP
 RUN git clone https://github.com/LLLeoLi/yahoo-finance-mcp \
     && cd yahoo-finance-mcp \
-    && git checkout ecb7f27b9747a10557082c9a993510d3f944d0bb \
+    && git checkout 69b743fb5aa85869af7b08fb74733ee21f6317ad \
     && uv sync
 
 # YouTube MCP Server

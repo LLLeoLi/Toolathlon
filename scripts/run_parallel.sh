@@ -25,7 +25,7 @@ TIMEOUT="5400" # the timeout for each task execution, including pre-processing, 
 
 # model sampling related arguments
 MAX_TOKENS="65536"
-IMAGE_NAME=${5:-"lockon0927/toolathlon-task-image:1016beta"}  # Docker image to use
+IMAGE_NAME=${5:-"llleoli612/toolathlon-task-image:iserror"}  # Docker image to use
 CONFIG_FILE_ARG=${6:-""}
 RUNNER=${7:-"containerized"}
 RUNMODE=${8:-"normal"}

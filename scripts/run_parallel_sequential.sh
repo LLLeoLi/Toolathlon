@@ -1,5 +1,5 @@
 # Some Configurations
-TASK_IMAGE=lockon0927/toolathlon-task-image:1016beta # this is the image we use for parallel evaluation
+TASK_IMAGE=llleoli612/toolathlon-task-image:iserror # this is the image we use for parallel evaluation
 DUMP_PATH="./dumps_finalexp" # you must have this ./ prefix or use absolute path
 poste_configure_dovecot=true # or `false` if your Linux distribution does not need to configure Dovecot to allow plaintext auth
 WROKERS=10

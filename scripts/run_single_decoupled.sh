@@ -32,7 +32,7 @@ modelname=${4:-"anthropic/claude-sonnet-4.5"}
 provider=${5:-"unified"}
 maxstep=${6:-"100"}
 eval_config=${7:-"scripts/formal_run_v0.json"}
-image_name=${8:-"lockon0927/toolathlon-task-image:1016beta"}
+image_name=${8:-"llleoli612/toolathlon-task-image:iserror"}
 arg9=${9:-""}
 arg10=${10:-""}
 arg11=${11:-""}
@@ -109,7 +109,7 @@ fi
 
 if [ -z "$task_dir_arg" ] || [ -z "$runmode" ] || [ -z "$modelname" ]; then
     echo "Usage: $0 <task_dir> <runmode> <dump_path> <modelname> [provider] [maxstep] [eval_config] [image_name] [agent_framework] [gateway_port]"
-    echo "Example: $0 finalpool/find-alita-paper quickstart /tmp/dumps anthropic/claude-sonnet-4.5 unified 100 scripts/formal_run_v0.json lockon0927/toolathlon-task-image:1016beta toolathlon_default"
+    echo "Example: $0 finalpool/find-alita-paper quickstart /tmp/dumps anthropic/claude-sonnet-4.5 unified 100 scripts/formal_run_v0.json llleoli612/toolathlon-task-image:iserror toolathlon_default"
     exit 1
 fi
 

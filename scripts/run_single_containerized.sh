@@ -21,7 +21,7 @@ modelname=${4:-"anthropic/claude-sonnet-4.5"}
 provider=${5:-"unified"}
 maxstep=${6:-"100"}
 eval_config=${7:-"scripts/formal_run_v0.json"}
-image_name=${8:-"lockon0927/toolathlon-task-image:1016beta"}
+image_name=${8:-"llleoli612/toolathlon-task-image:iserror"}
 containerized_mode=${TOOLATHLON_CONTAINERIZED_MODE:-"phased"}
 parent_captures_run_log=${TOOLATHLON_PARENT_CAPTURES_RUN_LOG:-"0"}
 
