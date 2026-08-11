@@ -501,6 +501,13 @@ class TaskAgent:
         # underscore aliases to the model.
         local_tools, local_name_aliases = alias_function_tools(local_tools)
 
+        # Local tools bypass the PTC sandbox even under ptc_only; the wrapper
+        # needs their names to answer misrouted sandbox calls with guidance.
+        if self.mcp_manager is not None:
+            self.mcp_manager.register_ptc_direct_tools(
+                tool.name for tool in local_tools
+            )
+
         # Prompt files are shared with other harnesses. Rewrite tool-name
         # references only in this OpenAI TaskAgent instance instead of editing
         # those source files globally. Include a few legacy misspellings found

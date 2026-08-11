@@ -67,16 +67,64 @@ logger = logging.getLogger(__name__)
 # the context. 0 disables.
 _MAX_OUTPUT_CHARS = int(os.getenv("TOOLATHLON_PTC_MAX_OUTPUT_CHARS", "10000"))
 
+# asyncio StreamReader line limit for the worker pipe. The default (64 KiB)
+# made any oversized protocol line — a huge print, a tool call with huge
+# arguments — raise ValueError out of readline() and abort the whole run.
+# The worker clips its own fields, so this is a generous backstop; overruns
+# are additionally handled gracefully in the read loop.
+_STREAM_LIMIT = 8 * 1024 * 1024
+
 
 # Persistent worker source. Stays alive across calls; talks JSON-line on
 # stdin/stdout. Kept as a string so we can drop it onto disk lazily.
 _PERSISTENT_WORKER = r'''
-import os, sys, json, csv, traceback, uuid
+import os, sys, json, csv, tempfile, threading, traceback, uuid
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 
-_proto_out = sys.stdout
+# Claim the protocol channel before any user code runs: dup the original
+# stdout fd for the JSON-line protocol, then point fd 1/2 at capture files.
+# Raw writes that bypass sys.stdout — subprocesses, os.write(1, ...),
+# print(file=sys.__stdout__) — land in the captures instead of corrupting
+# the protocol stream (which would crash the run or misattribute results).
+_proto_out = os.fdopen(os.dup(sys.stdout.fileno()), "w")
 _proto_in = sys.stdin
+
+_fd1_capture = tempfile.TemporaryFile(mode="w+b")
+_fd2_capture = tempfile.TemporaryFile(mode="w+b")
+os.dup2(_fd1_capture.fileno(), 1)
+os.dup2(_fd2_capture.fileno(), 2)
+_fd1_offset = 0
+_fd2_offset = 0
+
+
+def _drain_capture(f, offset):
+    """Read bytes appended to a capture file since `offset`."""
+    try:
+        f.seek(offset)
+        data = f.read()
+        return data.decode("utf-8", errors="replace"), offset + len(data)
+    except Exception:
+        return "", offset
+
+
+# Cap per-field payload so a single protocol line stays far below the
+# parent's stream limit; the parent applies its own (smaller) display
+# truncation on top of this.
+_MAX_FIELD_CHARS = 200000
+
+
+def _clip(text):
+    if text is None or len(text) <= _MAX_FIELD_CHARS:
+        return text
+    head = int(_MAX_FIELD_CHARS * 0.7)
+    tail = _MAX_FIELD_CHARS - head
+    omitted = len(text) - head - tail
+    return (text[:head] + "\n...[worker truncated " + str(omitted)
+            + " chars]...\n" + text[-tail:])
+
+
+_send_lock = threading.Lock()
 
 
 def _read_msg():
@@ -91,25 +139,52 @@ def _write_msg(msg):
     # type (a Decimal, a datetime) is sent as its string form rather than
     # raising here — the tool call still goes out, and the receiving tool
     # reports the type problem if it cares.
-    _proto_out.write(json.dumps(msg, default=str) + "\n")
-    _proto_out.flush()
+    data = json.dumps(msg, default=str) + "\n"
+    with _send_lock:
+        _proto_out.write(data)
+        _proto_out.flush()
+
+
+# Tool results are routed by request id so concurrent callers (user code
+# invoking tools from a ThreadPoolExecutor) each receive their own reply.
+# One thread at a time owns the protocol read; results for other requests
+# are parked in _rpc_results instead of being dropped (dropping them
+# deadlocked every caller whose reply another thread happened to consume).
+_rpc_cond = threading.Condition()
+_rpc_results = {}
+_rpc_reader_busy = False
 
 
 def _rpc_tool_call(tool_name, args, kwargs):
+    global _rpc_reader_busy
     req_id = uuid.uuid4().hex
     _write_msg({"type": "tool_call", "id": req_id,
                 "tool_name": tool_name,
                 "args": list(args),
                 "kwargs": dict(kwargs)})
     while True:
-        msg = _read_msg()
-        if msg.get("type") == "tool_result" and msg.get("id") == req_id:
-            if msg.get("ok"):
-                return msg.get("value")
-            # Raise (rather than return an error string) so failures surface
-            # as exceptions — try/except around tool calls works and errors
-            # never flow onward disguised as data.
-            raise RuntimeError(msg.get("error", "unknown error"))
+        with _rpc_cond:
+            if req_id in _rpc_results:
+                msg = _rpc_results.pop(req_id)
+                if msg.get("ok"):
+                    return msg.get("value")
+                # Raise (rather than return an error string) so failures
+                # surface as exceptions — try/except around tool calls works
+                # and errors never flow onward disguised as data.
+                raise RuntimeError(msg.get("error", "unknown error"))
+            if _rpc_reader_busy:
+                _rpc_cond.wait(0.05)
+                continue
+            _rpc_reader_busy = True
+        msg = None
+        try:
+            msg = _read_msg()
+        finally:
+            with _rpc_cond:
+                _rpc_reader_busy = False
+                if msg is not None and msg.get("type") == "tool_result":
+                    _rpc_results[msg.get("id")] = msg
+                _rpc_cond.notify_all()
 
 
 class _ToolProxy:
@@ -174,10 +249,18 @@ def main():
         except Exception:
             tb = traceback.format_exc()
 
+        # Merge raw fd-level output (subprocesses, os.write) captured since
+        # the previous exec into this exec's streams.
+        global _fd1_offset, _fd2_offset
+        fd1_text, _fd1_offset = _drain_capture(_fd1_capture, _fd1_offset)
+        fd2_text, _fd2_offset = _drain_capture(_fd2_capture, _fd2_offset)
+        stdout_text = (out_buf.getvalue() + fd1_text) or None
+        stderr_text = (err_buf.getvalue() + fd2_text) or None
+
         _write_msg({"type": "done",
-                    "stdout": out_buf.getvalue() or None,
-                    "stderr": err_buf.getvalue() or None,
-                    "error": tb})
+                    "stdout": _clip(stdout_text),
+                    "stderr": _clip(stderr_text),
+                    "error": _clip(tb)})
 
 
 if __name__ == "__main__":
@@ -228,6 +311,8 @@ _CODE_EXECUTION_DESCRIPTION_ONLY = (
     'Run Python that calls the tools listed above as `tools["tool_name"](*args, **kwargs)`. '
     "**This is the ONLY way to invoke env tools** — they cannot be called as standalone tool "
     "calls, so every env tool must go through this sandbox. "
+    "Local harness tools (names starting with `local_`, e.g. claiming the task is done) are "
+    "NOT env tools: invoke them as direct standalone tool calls, never through this sandbox. "
     "State (variables, imports) persists across calls. Use print() to see output.\n"
     + _CODE_EXECUTION_DESCRIPTION.split("\n", 1)[1]
 )
@@ -448,6 +533,13 @@ class PTCWrapper:
         # of a stop-tool call that exists.
         self._dispatched_tool_calls: List[Dict[str, Any]] = []
 
+        # Model-facing names of harness tools that are NOT routed through the
+        # sandbox (local FunctionTools like local_claim_done). Without this,
+        # a sandbox call to one of them got a generic unknown-tool message
+        # whose suggestions were unrelated MCP tools — self-contradictory,
+        # since the name *is* on the model's tool list.
+        self._direct_tool_names: set = set()
+
     async def setup(self) -> None:
         await self._ensure_index()
 
@@ -535,6 +627,16 @@ class PTCWrapper:
         canonical = to_model_tool_name(tool_name)
         return canonical if canonical in self._tool_index else None
 
+    def register_direct_tools(self, names) -> None:
+        """Declare tools that exist on the model's tool list but bypass PTC.
+
+        Local harness FunctionTools (claim_done, sleep, …) are invoked as
+        standalone tool calls even under ptc_only; registering them lets the
+        sandbox answer a misrouted call with targeted guidance instead of a
+        misleading unknown-tool message.
+        """
+        self._direct_tool_names.update(to_model_tool_name(n) for n in names)
+
     def drain_dispatched_tool_calls(self) -> List[Dict[str, Any]]:
         """Return sandbox-dispatched tool calls since the last drain, oldest first.
 
@@ -593,6 +695,18 @@ class PTCWrapper:
                 except asyncio.TimeoutError:
                     await self._kill_worker()
                     return _ptc_text_result(timeout_msg)
+                except ValueError:
+                    # Oversized line (StreamReader limit) or non-JSON bytes on
+                    # the pipe. The stream can no longer be trusted — replace
+                    # the worker and report, instead of letting the exception
+                    # abort the whole task run.
+                    await self._kill_worker()
+                    return _ptc_text_result(
+                        "[ptc] protocol stream corrupted or a single message "
+                        "exceeded the size limit — avoid printing or passing "
+                        "extremely large payloads in one call"
+                        f"{_RESTART_NOTE}"
+                    )
                 if msg is None:
                     await self._kill_worker()
                     return _ptc_text_result(
@@ -600,12 +714,32 @@ class PTCWrapper:
                         "killed the interpreter, e.g. os._exit or a segfault)"
                         f"{_RESTART_NOTE}"
                     )
+                if not isinstance(msg, dict):
+                    await self._kill_worker()
+                    return _ptc_text_result(
+                        "[ptc] protocol stream corrupted (unexpected message "
+                        f"shape){_RESTART_NOTE}"
+                    )
 
                 mtype = msg.get("type")
                 if mtype == "done":
                     return _format_exec_result(msg)
                 if mtype == "tool_call":
-                    await self._handle_tool_call(msg)
+                    # The per-call budget must also cover time spent inside
+                    # the dispatched tool; an MCP call that hangs otherwise
+                    # blocks here forever while holding _proc_lock, wedging
+                    # every later PTC call in the run.
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        await self._kill_worker()
+                        return _ptc_text_result(timeout_msg)
+                    try:
+                        await asyncio.wait_for(
+                            self._handle_tool_call(msg), timeout=remaining
+                        )
+                    except asyncio.TimeoutError:
+                        await self._kill_worker()
+                        return _ptc_text_result(timeout_msg)
                     continue
                 logger.warning("PTC worker sent unknown message: %s", mtype)
 
@@ -626,6 +760,22 @@ class PTCWrapper:
                 "error": (
                     f"'{self.CODE_EXECUTION_TOOL}' must be invoked as a direct "
                     "tool call, not from inside programmatic_tool_call"
+                ),
+            })
+            return
+
+        # Local harness tools are on the model's tool list but not in the
+        # sandbox index; without this branch they fell through to the
+        # unknown-tool message, whose suggestions (unrelated MCP tools)
+        # contradicted the tool list and could loop the model.
+        requested = to_model_tool_name(tool_name)
+        if requested in self._direct_tool_names:
+            await self._send({
+                "type": "tool_result", "id": req_id, "ok": False,
+                "error": (
+                    f"'{requested}' is a local harness tool, not an env tool "
+                    "— it is not available inside this sandbox. Invoke it as "
+                    "a direct standalone tool call from your tool list."
                 ),
             })
             return
@@ -792,6 +942,7 @@ class PTCWrapper:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=self._workspace,
+            limit=_STREAM_LIMIT,
         )
 
         init = json.dumps({"workspace": self._workspace}) + "\n"
