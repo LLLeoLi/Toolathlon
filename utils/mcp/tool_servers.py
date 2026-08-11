@@ -361,6 +361,16 @@ class MCPServerManager:
                 f"'{wrapper.CODE_EXECUTION_TOOL}'"
             )
 
+    def register_ptc_direct_tools(self, names) -> None:
+        """Tell the PTC wrapper which model-facing tools bypass the sandbox.
+
+        No-op when PTC is off. Local FunctionTools stay directly callable
+        even under ptc_only; registering their names turns a misrouted
+        sandbox call into targeted guidance instead of "unknown tool".
+        """
+        if self._ptc_wrapper is not None:
+            self._ptc_wrapper.register_direct_tools(names)
+
     def drain_ptc_dispatched_tool_calls(self) -> List[Dict[str, Any]]:
         """Tool calls made from inside the PTC sandbox since the last drain.
 
